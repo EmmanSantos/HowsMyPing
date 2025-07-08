@@ -114,7 +114,7 @@ def plot_subproc(y_q: mp.Queue):
 
         ax3 = figure.add_subplot(3,1,3)
 
-        animation = FuncAnimation(figure, update,fargs=[y_q], interval=200,cache_frame_data=False)
+        animation = FuncAnimation(figure, update,fargs=[y_q], interval=500,cache_frame_data=False)
         plt.show()
         time.sleep(0.5)
 
@@ -135,9 +135,12 @@ def main():
 
         # host = tcpping("10.145.27.124",53,1,1)
         host = ping(ip,1,timeout=1)
+        if host.packets_received != 0 and host.min_rtt == 0:
+            data_q.put(0.0001)
+            continue
         print(host.min_rtt)
         data_q.put(host.min_rtt)
-        time.sleep(0.2)
+        time.sleep(0.5)
 
 
 if __name__ == '__main__':
