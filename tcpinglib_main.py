@@ -2,6 +2,7 @@
 from icmplib import ping
 import time
 import multiprocessing as mp
+import sys
 
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
@@ -89,10 +90,15 @@ def main():
     data_q = mp.Queue()
     plot_window = mp.Process(target=plot_subproc,args=[data_q])
     plot_window.start()
+    if len(sys.argv) > 1:
+        ip = sys.argv[1]
+    else:
+        ip = "8.8.8.8"
 
     while True:
+
         # host = tcpping("10.145.27.124",53,1,1)
-        host = ping("8.8.8.8",1,timeout=1)
+        host = ping(ip,1,timeout=1)
         print(host.min_rtt)
         if host.min_rtt != 0:
             data_q.put(host.min_rtt)
