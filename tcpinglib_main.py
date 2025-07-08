@@ -1,4 +1,5 @@
-from tcppinglib import tcpping
+# from tcppinglib import tcpping
+from icmplib import ping
 import time
 import multiprocessing as mp
 
@@ -90,7 +91,8 @@ def main():
     plot_window.start()
 
     while True:
-        host = tcpping("10.145.27.124",53,1,1)
+        # host = tcpping("10.145.27.124",53,1,1)
+        host = ping("8.8.8.8",1,timeout=1)
         print(host.min_rtt)
         if host.min_rtt != 0:
             data_q.put(host.min_rtt)
