@@ -17,7 +17,7 @@ A Python-based utility for visualizing network latency over time using ICMP ping
 
 ## 🛠️ Configuration
 
-Modify the `config.ini` or `.cfg` file with the following options:
+Modify the `config.ini` file with the following options:
 
 ```ini
 [DEFAULT]
