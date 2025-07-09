@@ -20,12 +20,10 @@ A Python-based utility for visualizing network latency over time using ICMP ping
 Modify the `config.ini` or `.cfg` file with the following options:
 
 ```ini
-[ip_config]
+[DEFAULT]
 ip = 8.8.8.8              # IP address or domain to ping
 timeout = 1               # Timeout for ping in seconds
 interval = 0.5            # Interval between pings in seconds
-
-[plot_config]
 fig_refresh = 500         # Plot refresh rate in milliseconds
 main_length = 100         # Number of samples for main time graph
 smaller_length = 20       # Number of samples for smaller boxplot
