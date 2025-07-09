@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import multiprocessing as mp
 
-def plot_subproc(y_q: mp.Queue):
+def plot_subproc(y_q: mp.Queue,ip: str):
     plt.close()
 
     y_data=[]
@@ -20,9 +20,13 @@ def plot_subproc(y_q: mp.Queue):
     loss_arr = []
     loss_arr_len = 0
 
+    all_data = []
+    all_data_len = 0
 
     #Update routine that is called by FuncAnimation instance to update plot data, returns 2D tuple that is used to graph
     def update(frame,y_q: mp.Queue):
+        nonlocal ip
+
         nonlocal y_data
         nonlocal y_data_len1
         nonlocal new_data_count
@@ -31,8 +35,9 @@ def plot_subproc(y_q: mp.Queue):
         nonlocal y_data_len
         nonlocal loss_arr
         nonlocal loss_arr_len
-        
 
+        nonlocal all_data
+        nonlocal all_data_len
 
         if y_q.empty() == False:
 
@@ -40,33 +45,54 @@ def plot_subproc(y_q: mp.Queue):
             while y_q.qsize() >0:
                 last_q = y_q.get()
                 
+                # if not 0 packet is not dropped
                 if last_q !=0:
                     y_data.append(last_q)
+
+                    # append loss array 0 - means no packet lost
                     loss_arr.append(0)
                     loss_arr_len +=1
-                
-                    if y_data_len < 100:
+
+                    # length is stored because len() is slow
+                    if y_data_len < len_2:
                         y_data_len+=1
 
                     new_data_count +=1
                 else:
+                    # append loss array 1 - means packet lost
                     loss_arr.append(1)
                     loss_arr_len +=1
-            
-            if loss_arr_len >100:
-                loss_arr_len = 100
+
+                    # plot packet loss
+                    
+                
+                all_data.append(last_q)
+                all_data_len+=1
+
+            if loss_arr_len >len_2:
+                loss_arr_len = len_2
+
+            if all_data_len >len_2:
+                all_data_len = len_2
 
             y_data_len1 = y_data[-len_1:] if y_data_len>=len_1 else y_data
             y_data = y_data[-len_2:] if y_data_len>=len_2 else y_data
             loss_arr = loss_arr[-len_2:] if loss_arr_len>=len_2 else loss_arr
-   
+
+            all_data = all_data[-len_2:] if all_data_len>=len_2 else all_data
+            
+            
         
             ax2.clear()
-            ax2.set_title("Packet Loss: "+str(sum(loss_arr))+"/"+str(loss_arr_len))
-            ax2.plot(range(0,y_data_len),y_data)
+            ax2.set_title("Pinging: "+ip+" | Packet Loss: "+str(sum(loss_arr))+"/"+str(loss_arr_len)+" | Last Ping: "+str(last_q))
+            ax2.plot(range(0,all_data_len),all_data)
             ax2.grid(alpha=0.7)
             
-            if new_data_count>= 5:
+            for x, y in zip(range(0,all_data_len), all_data):
+                if y == 0:
+                    ax2.axvspan(x - 0.1, x + 0.1, color='red', alpha=0.3)
+
+            if new_data_count>= 4:
 
                 
 
@@ -122,14 +148,15 @@ def plot_subproc(y_q: mp.Queue):
 
 def main():
     
-    data_q = mp.Queue()
-    loss_q = mp.Queue()
-    plot_window = mp.Process(target=plot_subproc,args=[data_q])
-    plot_window.start()
     if len(sys.argv) > 1:
         ip = sys.argv[1]
     else:
         ip = "8.8.8.8"
+
+    data_q = mp.Queue()
+    loss_q = mp.Queue()
+    plot_window = mp.Process(target=plot_subproc,args=[data_q,ip])
+    plot_window.start()
 
     while True:
 
