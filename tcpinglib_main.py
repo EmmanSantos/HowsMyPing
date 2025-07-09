@@ -11,8 +11,8 @@ import multiprocessing as mp
 def plot_subproc(y_q: mp.Queue,ip: str):
     plt.close()
 
-    y_data=[]
-    y_data_len1 =[]
+    y_data=[] # ping data without timeouts
+    y_data_len1 =[] #
     new_data_count = 0
     len_1 = 20
     len_2 = 100
@@ -46,7 +46,7 @@ def plot_subproc(y_q: mp.Queue,ip: str):
                 last_q = y_q.get()
                 
                 # if not 0 packet is not dropped
-                if last_q !=0:
+                if last_q >=0:
                     y_data.append(last_q)
 
                     # append loss array 0 - means no packet lost
@@ -84,12 +84,12 @@ def plot_subproc(y_q: mp.Queue,ip: str):
             
         
             ax2.clear()
-            ax2.set_title("Pinging: "+ip+" | Packet Loss: "+str(sum(loss_arr))+"/"+str(loss_arr_len)+" | Last Ping: "+str(last_q))
+            ax2.set_title("Pinging: "+ip+" | Packet Loss: "+str(sum(loss_arr))+"/"+str(loss_arr_len)+" | Last Ping: "+str(last_q if last_q >=0 else "Timeout"))
             ax2.plot(range(0,all_data_len),all_data)
             ax2.grid(alpha=0.7)
             
             for x, y in zip(range(0,all_data_len), all_data):
-                if y == 0:
+                if y < 0:
                     ax2.axvspan(x - 0.1, x + 0.1, color='red', alpha=0.3)
 
             if new_data_count>= 4:
@@ -162,12 +162,13 @@ def main():
 
         # host = tcpping("10.145.27.124",53,1,1)
         host = ping(ip,1,timeout=1)
-        if host.packets_received != 0 and host.min_rtt == 0:
-            data_q.put(0.0001)
-            continue
-        print(host.min_rtt)
-        data_q.put(host.min_rtt)
-        time.sleep(0.5)
+        if host.packets_received ==0:
+            data_q.put(-0.0001) #place negative number to indicate timeout; simplifies graphing the timeouts and reduces CPU usage
+            print("Timeout")
+        else:
+            print(host.min_rtt)
+            data_q.put(host.min_rtt)
+            time.sleep(0.5)
 
 
 if __name__ == '__main__':
