@@ -1,4 +1,4 @@
-# from tcppinglib import tcpping
+import configparser
 from icmplib import ping
 import time
 import multiprocessing as mp
@@ -11,11 +11,14 @@ import multiprocessing as mp
 def plot_subproc(y_q: mp.Queue,ip: str):
     plt.close()
 
+    config = configparser.ConfigParser()
+    config.read('./config.ini')
+
     y_data=[] # ping data without timeouts
     y_data_len1 =[] #
     new_data_count = 0
-    len_1 = 20
-    len_2 = 200
+    len_1 = int(config.get('DEFAULT','smaller_length',fallback=20))
+    len_2 = int(config.get('DEFAULT','main_length',fallback=100))
     y_data_len = 0
     loss_arr = []
     loss_arr_len = 0
@@ -92,14 +95,14 @@ def plot_subproc(y_q: mp.Queue,ip: str):
                 if y < 0:
                     ax2.axvspan(x - 0.1, x + 0.1, color='red', alpha=0.3)
 
-            if new_data_count>= 4:
+            if new_data_count>= int(config.get('DEFAULT','boxplot_refresh_count',fallback=4)):
 
                 
 
                 ax.clear()
                 ax.grid(alpha=0.7)
-                ax.tick_params(labelbottom=False, labelleft=False)
-                ax.boxplot(y_data,vert=False,widths=0.7)
+                ax.tick_params(labelbottom=False)
+                ax.boxplot(y_data,vert=False,widths=0.7,tick_labels = ['Last '+str(y_data_len)])
                 ax.scatter( y_data,[1]*y_data_len, alpha=0.6, color='blue', label='Data Points')
                 
 
@@ -107,8 +110,7 @@ def plot_subproc(y_q: mp.Queue,ip: str):
 
                 ax3.clear()
                 ax3.grid(alpha=0.7)
-                ax3.tick_params(labelleft=False)
-                ax3.boxplot(y_data_len1,vert=False,widths=0.7)
+                ax3.boxplot(y_data_len1,vert=False,widths=0.7,tick_labels = ['Last '+str(y_data_len if y_data_len < len_1 else len_1 )])
                 ax3.scatter( y_data_len1,[1]*len(y_data_len1), alpha=0.6, color='blue', label='Data Points')
 
         
@@ -140,40 +142,45 @@ def plot_subproc(y_q: mp.Queue,ip: str):
 
         ax3 = figure.add_subplot(3,1,3)
 
-        animation = FuncAnimation(figure, update,fargs=[y_q], interval=500,cache_frame_data=False)
+        animation = FuncAnimation(figure, update,fargs=[y_q], interval=int(config.get('DEFAULT','fig_refresh',fallback=500)),cache_frame_data=False)
         plt.show()
         time.sleep(0.5)
 
 
 
 def main():
+
+    config = configparser.ConfigParser()
+    config.read('./config.ini')
     
     if len(sys.argv) > 1:
         ip = sys.argv[1]
     else:
-        ip = "8.8.8.8"
+        ip = str(config.get('DEFAULT','ip',fallback='8.8.8.8'))
 
     data_q = mp.Queue()
-    loss_q = mp.Queue()
     plot_window = mp.Process(target=plot_subproc,args=[data_q,ip])
     plot_window.start()
 
     while True:
 
         # host = tcpping("10.145.27.124",53,1,1)
-        host = ping(ip,1,timeout=1)
+        host = ping(ip,1,timeout=float(config.get('DEFAULT','timeout',fallback=1)))
         if host.packets_received ==0:
             data_q.put(-0.0001) #place negative number to indicate timeout; simplifies graphing the timeouts and reduces CPU usage
             print("Timeout")
         else:
             print(host.min_rtt)
             data_q.put(host.min_rtt)
-            time.sleep(0.5)
+            time.sleep(float(config.get('DEFAULT','interval',fallback=0.5)))
 
 
 if __name__ == '__main__':
     try:
         mp.freeze_support()
         main()
-    except:
+    except Exception as e:
+        print("Error: {}".format(e))
         input("Enter to Close")
+        raise e
+        
