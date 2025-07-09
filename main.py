@@ -172,5 +172,8 @@ def main():
 
 
 if __name__ == '__main__':
-    mp.freeze_support()
-    main()
+    try:
+        mp.freeze_support()
+        main()
+    except:
+        input("Enter to Close")
