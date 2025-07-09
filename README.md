@@ -2,6 +2,10 @@
 
 A Python-based utility for visualizing network latency over time using ICMP pings. The tool features real-time graphing and statistical analysis of response times.
 
+
+![image](https://github.com/user-attachments/assets/16791d57-eadd-44f0-8c20-995fb2c4f111)
+
+
 ## 🚀 Features
 
 - **Live Ping vs Time Graph**
