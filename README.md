@@ -1,6 +1,6 @@
 # How's My Ping?
 
-A Python-based utility for visualizing network latency over time using ICMP pings. The tool features real-time graphing and box plots to visualize connection quality.
+A Python-based utility for testing ping and visualizing network latency over time using ICMP pings. The tool features real-time graphing and box plots to visualize connection quality.
 
 
 ![image](https://github.com/user-attachments/assets/16791d57-eadd-44f0-8c20-995fb2c4f111)
