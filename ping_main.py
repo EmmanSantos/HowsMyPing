@@ -15,23 +15,23 @@ def draw_boxplot_stats(data: list, length: int,boxplot: plt.Axes,boxplot_dict: d
     '''
     # get boxplot 1 stats
     stats_str =''
-    if eval(config.get('DEFAULT','mean',fallback=True)):
+    if eval(config.get('DEFAULT','mean',fallback='True')):
         mean = round(sum(data)/length,2)
         stats_str += 'Mean: '+str(mean)
         # draw mean
         boxplot.axvline(mean, color='purple', alpha=0.8)
 
-    if eval(config.get('DEFAULT','median',fallback=True)):
+    if eval(config.get('DEFAULT','median',fallback='True')):
         if stats_str!= '': stats_str+='\n'
         median = boxplot_dict['medians'][0]
         median =round(median.get_xdata()[0],2)
         stats_str += 'Median: '+str(median)
 
-    if eval(config.get('DEFAULT','maximum',fallback=True)):
+    if eval(config.get('DEFAULT','maximum',fallback='True')):
         if stats_str!= '': stats_str+='\n'
         stats_str += 'Max: '+str(max(data))
 
-    if eval(config.get('DEFAULT','minimum',fallback=True)):
+    if eval(config.get('DEFAULT','minimum',fallback='True')):
         if stats_str!= '': stats_str+='\n'
         stats_str += 'Min: '+str(min(data))
 
