@@ -3,7 +3,8 @@
 A Python-based utility for testing ping and visualizing network latency over time using ICMP pings. The tool features real-time graphing and box plots to visualize connection quality.
 
 
-![image](https://github.com/user-attachments/assets/16791d57-eadd-44f0-8c20-995fb2c4f111)
+<img width="873" height="514" alt="image" src="https://github.com/user-attachments/assets/7780ed2e-70ba-45f0-ae50-7ff644ab9115" />
+
 
 
 ## 🚀 Features
@@ -52,3 +53,9 @@ fig_refresh = 500         # Plot refresh rate in milliseconds
 main_length = 100         # Number of samples for main time graph
 smaller_length = 20       # Number of samples for smaller boxplot
 boxplot_refresh_count = 4 # Update boxplot every N pings
+
+# Show/Hide Stats
+mean = True
+median = True
+maximum = True
+minimum = True
