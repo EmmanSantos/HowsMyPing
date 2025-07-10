@@ -18,7 +18,15 @@ A Python-based utility for testing ping and visualizing network latency over tim
 
 - **Customizable via Config File**
   - Easily tweak settings without changing the code.
-
+ 
+## 💻 Command Line Args
+- Run using command line if for integrating with scripts that use automatic IP detection. **Arguments are prioritized** over the `config.ini`
+```args
+ping_tester-va.b.c.exe <ip address>
+```
+```args2
+ping_main.py <ip address>
+```
 ## 🛠️ Configuration
 
 Modify the `config.ini` file with the following options:
