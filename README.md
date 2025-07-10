@@ -15,6 +15,18 @@ A Python-based utility for testing ping and visualizing network latency over tim
 - **Boxplot Analysis**
   - A full boxplot displays **all samples** in the current time window.
   - A second boxplot shows only the **most recent subset** of pings for more responsive statistics.
+  - From the matplotlib documentation: https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.boxplot.html
+  ```
+            Q1-1.5IQR   Q1   median  Q3   Q3+1.5IQR
+                      |-----:-----|
+      o      |--------|     :     |--------|    o  o
+                      |-----:-----|
+    flier             <----------->            fliers
+                           IQR
+  ```
+
+    
+    - Check the wiki page for more information: https://en.wikipedia.org/wiki/Box_plot 
 
 - **Customizable via Config File**
   - Easily tweak settings without changing the code.
