@@ -8,6 +8,37 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import multiprocessing as mp
 
+def draw_boxplot_stats(data: list, length: int,boxplot: plt.Axes,boxplot_dict: dict,config: configparser.ConfigParser):
+    '''
+    Generate stats list beside each box plot
+    
+    '''
+    # get boxplot 1 stats
+    stats_str =''
+    if eval(config.get('DEFAULT','mean',fallback=True)):
+        mean = round(sum(data)/length,2)
+        stats_str += 'Mean: '+str(mean)
+        # draw mean
+        boxplot.axvline(mean, color='purple', alpha=0.8)
+
+    if eval(config.get('DEFAULT','median',fallback=True)):
+        if stats_str!= '': stats_str+='\n'
+        median = boxplot_dict['medians'][0]
+        median =round(median.get_xdata()[0],2)
+        stats_str += 'Median: '+str(median)
+
+    if eval(config.get('DEFAULT','maximum',fallback=True)):
+        if stats_str!= '': stats_str+='\n'
+        stats_str += 'Max: '+str(max(data))
+
+    if eval(config.get('DEFAULT','minimum',fallback=True)):
+        if stats_str!= '': stats_str+='\n'
+        stats_str += 'Min: '+str(min(data))
+
+    boxplot.text(1.01,0.5,stats_str, ha = 'left',va = 'center',fontsize='small',transform = boxplot.transAxes )
+        
+    return
+
 def plot_subproc(y_q: mp.Queue,ip: str):
     plt.close()
 
@@ -89,57 +120,48 @@ def plot_subproc(y_q: mp.Queue,ip: str):
             
             
             # update time plot
-            ax2.clear()
-            ax2.set_title("Pinging: "+ip+" | Packet Loss: "+str(sum(loss_arr))+"/"+str(loss_arr_len)+" | Last Ping: "+str(last_q if last_q >=0 else "Timeout"))
-            ax2.plot(range(0,all_data_len),all_data)
-            ax2.grid(alpha=0.7)
+            timeplot.clear()
+            timeplot.set_title("Pinging: "+ip+" | Packet Loss: "+str(sum(loss_arr))+"/"+str(loss_arr_len)+" | Last Ping: "+str(last_q if last_q >=0 else "Timeout"))
+            timeplot.plot(range(0,all_data_len),all_data)
+            timeplot.grid(alpha=0.7)
             
             # plot timeouts
             for x, y in zip(range(0,all_data_len), all_data):
                 if y < 0:
-                    ax2.axvspan(x - 0.1, x + 0.1, color='red', alpha=0.3)
+                    timeplot.axvspan(x - 0.1, x + 0.1, color='red', alpha=0.3)
 
             # update boxplots if new packets received are over the threshold
             if new_data_count>= int(config.get('DEFAULT','boxplot_refresh_count',fallback=4)):
                 
                 # update boxplot 1
-                ax.clear()
-                ax.grid(alpha=0.7)
-                ax.tick_params(labelbottom=False)
-                box1 =ax.boxplot(y_data,vert=False,widths=0.7,tick_labels= ['Last '+str(y_data_len)])
-                ax.scatter( y_data,[1]*y_data_len, alpha=0.6, color='blue', label='Data Points')
+                boxplot1.clear()
+                boxplot1.grid(alpha=0.7)
+                boxplot1.tick_params(labelbottom=False)
+                box1_dict =boxplot1.boxplot(y_data,vert=False,widths=0.7,tick_labels= ['Last '+str(y_data_len)])
+                boxplot1.scatter( y_data,[1]*y_data_len, alpha=0.6, color='blue', label='Data Points')
                 
                 # get boxplot 1 stats
-                mean = round(sum(y_data)/y_data_len,2)
-                median = box1['medians'][0]
-                median =round(median.get_xdata()[0],2)
-                stats = 'Mean: '+str(mean)+'\nMedian: '+str(median)
-                ax.text(1.01,0.5,stats, ha = 'left',va = 'center',fontsize='small',transform = ax.transAxes )
+                draw_boxplot_stats(y_data,y_data_len,boxplot1,box1_dict,config)
                 
-                # draw mean
-                ax.axvline(mean, color='purple', alpha=0.8)
+                
 
                 # update boxplot 2          
-                ax3.clear()
-                ax3.grid(alpha=0.7)
-                box2 = ax3.boxplot(y_data_len1,vert=False,widths=0.7,tick_labels = ['Last '+str(y_data_len if y_data_len < len_1 else len_1 )])
-                ax3.scatter( y_data_len1,[1]*len(y_data_len1), alpha=0.6, color='blue', label='Data Points')
+                boxplot2.clear()
+                boxplot2.grid(alpha=0.7)
+                box2_dict = boxplot2.boxplot(y_data_len1,vert=False,widths=0.7,tick_labels = ['Last '+str(y_data_len if y_data_len < len_1 else len_1 )])
+                boxplot2.scatter( y_data_len1,[1]*len(y_data_len1), alpha=0.6, color='blue', label='Data Points')
 
-                # get boxplot 2 stats
-                mean2 = round(sum(y_data_len1)/(y_data_len if y_data_len < len_1 else len_1),2)
-                median2 = box2['medians'][0]
-                median2 = round(median2.get_xdata()[0],2)
-                stats2 = 'Mean: '+str(mean2)+'\nMedian: '+str(median2)
-                ax3.text(1.01,0.5,stats2, ha = 'left',va = 'center',fontsize='small',transform = ax3.transAxes)
+                # # get boxplot 2 stats
+                # stats2 = gen_boxplot_stats(y_data,y_data_len,boxplot2,box2_dict)[0]
+                draw_boxplot_stats(y_data_len1,y_data_len if y_data_len < len_1 else len_1,boxplot2,box2_dict,config)
                 
-                # draw mean
-                ax3.axvline(mean2, color='purple', alpha=0.8)
+
 
         
-                if ax.get_xlim()[1]>ax3.get_xlim()[1]:
-                    ax3.set_xlim(ax.get_xlim())
+                if boxplot1.get_xlim()[1]>boxplot2.get_xlim()[1]:
+                    boxplot2.set_xlim(boxplot1.get_xlim())
                 else:
-                    ax.set_xlim(ax3.get_xlim())
+                    boxplot1.set_xlim(boxplot2.get_xlim())
                 new_data_count = 0
 
         # line.set_data(x_data,y_data)
@@ -156,17 +178,17 @@ def plot_subproc(y_q: mp.Queue,ip: str):
         figure = plt.figure(num=1,figsize=(8,4),constrained_layout=True)
 
         # boxplot 1
-        ax = figure.add_subplot(3,1,2)
-        ax.clear()
-        ax.grid(alpha=0.7)
-        ax.boxplot(y_data)
+        boxplot1 = figure.add_subplot(3,1,2)
+        boxplot1.clear()
+        boxplot1.grid(alpha=0.7)
+        boxplot1.boxplot(y_data)
 
         # timeplost
-        ax2 = figure.add_subplot(3,1,1)
-        ax2.plot(y_data,range(0,len(y_data)))
+        timeplot = figure.add_subplot(3,1,1)
+        timeplot.plot(y_data,range(0,len(y_data)))
 
         # boxplot 2
-        ax3 = figure.add_subplot(3,1,3)
+        boxplot2 = figure.add_subplot(3,1,3)
 
         # plot is an animation running on a subprocess so pings continue and are not blocked by plot
         animation = FuncAnimation(figure, update,fargs=[y_q], interval=int(config.get('DEFAULT','fig_refresh',fallback=500)),cache_frame_data=False)
