@@ -53,10 +53,11 @@ def plot_subproc(y_q: mp.Queue,ip: str):
     len_2 = int(config.get('DEFAULT','main_length',fallback=100))
     
     loss_arr = [] # counting dropped packets
-    loss_arr_len = 0
+
 
     all_data = [] # contains all ping measurements including dropped packets
     all_data_len = 0
+    x_all_data = []
 
     #Update routine that is called by FuncAnimation instance to update plot data, returns 2D tuple that is used to graph
     def update(frame,y_q: mp.Queue):
@@ -69,10 +70,12 @@ def plot_subproc(y_q: mp.Queue,ip: str):
         nonlocal len_2
         nonlocal y_data_len
         nonlocal loss_arr
-        nonlocal loss_arr_len
 
         nonlocal all_data
         nonlocal all_data_len
+        nonlocal x_all_data
+
+        nonlocal ping_line
 
         if y_q.empty() == False:
 
@@ -86,7 +89,7 @@ def plot_subproc(y_q: mp.Queue,ip: str):
 
                     # append 0 to loss array  - means no packet lost
                     loss_arr.append(0)
-                    loss_arr_len +=1
+
 
                     # length is stored because len() is slow
                     if y_data_len < len_2:
@@ -96,17 +99,20 @@ def plot_subproc(y_q: mp.Queue,ip: str):
                 else:
                     # append 1 to loss array  - means packet lost
                     loss_arr.append(1)
-                    loss_arr_len +=1
+
 
                     # plot packet loss
-                    
+
                 
                 all_data.append(last_q)
                 all_data_len+=1
+                if all_data_len<=len_2: x_all_data.append(all_data_len) 
+                
+
+                
+                
 
             # Caps the length of the  arrays
-            if loss_arr_len >len_2:
-                loss_arr_len = len_2
 
             if all_data_len >len_2:
                 all_data_len = len_2
@@ -114,21 +120,21 @@ def plot_subproc(y_q: mp.Queue,ip: str):
             # discards older data if longer than desired length
             y_data_len1 = y_data[-len_1:] if y_data_len>=len_1 else y_data
             y_data = y_data[-len_2:] if y_data_len>=len_2 else y_data
-            loss_arr = loss_arr[-len_2:] if loss_arr_len>=len_2 else loss_arr
+            loss_arr = loss_arr[-len_2:] if all_data_len>=len_2 else loss_arr
 
             all_data = all_data[-len_2:] if all_data_len>=len_2 else all_data
             
             
             # update time plot
             timeplot.clear()
-            timeplot.set_title("Pinging: "+ip+" | Packet Loss: "+str(sum(loss_arr))+"/"+str(loss_arr_len)+" | Last Ping: "+str(last_q if last_q >=0 else "Timeout"))
-            timeplot.plot(range(0,all_data_len),all_data)
+            timeplot.set_title("Pinging: "+ip+" | Packet Loss: "+str(sum(loss_arr))+"/"+str(all_data_len)+" | Last Ping: "+str(last_q if last_q >=0 else "Timeout"))
+            timeplot.plot(x_all_data,all_data)
             timeplot.grid(alpha=0.7)
             
-            # plot timeouts
-            for x, y in zip(range(0,all_data_len), all_data):
-                if y < 0:
-                    timeplot.axvspan(x - 0.1, x + 0.1, color='red', alpha=0.3)
+            # # plot timeouts
+            # for x, y in zip(range(0,all_data_len), all_data):
+            #     if y < 0:
+            #         timeplot.axvspan(x - 0.1, x + 0.1, color='red', alpha=0.3)
 
             # update boxplots if new packets received are over the threshold
             if new_data_count>= int(config.get('DEFAULT','boxplot_refresh_count',fallback=4)):
@@ -185,7 +191,7 @@ def plot_subproc(y_q: mp.Queue,ip: str):
 
         # timeplost
         timeplot = figure.add_subplot(3,1,1)
-        timeplot.plot(y_data,range(0,len(y_data)))
+        ping_line = timeplot.plot(x_all_data,all_data)
 
         # boxplot 2
         boxplot2 = figure.add_subplot(3,1,3)
