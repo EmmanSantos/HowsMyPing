@@ -126,15 +126,23 @@ def plot_subproc(y_q: mp.Queue,ip: str):
             
             
             # update time plot
-            timeplot.clear()
+            for artist in timeplot.lines:
+                artist.remove()
+            for patch in timeplot.patches[:]:
+                patch.remove()
+            timeplot.set_prop_cycle(None) 
             timeplot.set_title("Pinging: "+ip+" | Packet Loss: "+str(sum(loss_arr))+"/"+str(all_data_len)+" | Last Ping: "+str(last_q if last_q >=0 else "Timeout"))
-            timeplot.plot(x_all_data,all_data)
+            timeplot.plot(x_all_data,all_data, color='blue')
             timeplot.grid(alpha=0.7)
+
             
-            # # plot timeouts
-            # for x, y in zip(range(0,all_data_len), all_data):
-            #     if y < 0:
-            #         timeplot.axvspan(x - 0.1, x + 0.1, color='red', alpha=0.3)
+            
+            
+            # plot timeouts
+            for x, y in zip(range(1,all_data_len), all_data):
+                if y < 0:
+                    timeplot.axvspan(x - 0.1, x + 0.1, color='red', alpha=0.3)
+                    
 
             # update boxplots if new packets received are over the threshold
             if new_data_count>= int(config.get('DEFAULT','boxplot_refresh_count',fallback=4)):
