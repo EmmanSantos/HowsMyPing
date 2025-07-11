@@ -31,6 +31,12 @@ A Python-based utility for testing ping and visualizing network latency over tim
 
 - **Customizable via Config File**
   - Easily tweak settings without changing the code.
+
+## How to Use
+1. Download ping-tester.zip
+2. Extract to any location
+3. Run ping-tester.exe
+4. Change config file if necessary
  
 ## 💻 Command Line Args
 - Run using command line if for integrating with scripts that use automatic IP detection. **Arguments are prioritized** over the `config.ini`
