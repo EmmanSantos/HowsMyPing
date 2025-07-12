@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import multiprocessing as mp
 
+def is_close_tuple(t1, t2, tol=1e-2):
+    return all(abs(a - b) <= tol for a, b in zip(t1, t2))
+
 def draw_boxplot_stats(data: list, length: int,boxplot: plt.Axes,boxplot_dict: dict,config: configparser.ConfigParser):
     '''
     Generate stats list beside each box plot
@@ -59,6 +62,9 @@ def plot_subproc(y_q: mp.Queue,ip: str):
     all_data_len = 0
     x_all_data = []
 
+    last_lims1 = ()
+    last_lims2 = ()
+
     #Update routine that is called by FuncAnimation instance to update plot data, returns 2D tuple that is used to graph
     def update(frame,y_q: mp.Queue):
         nonlocal ip
@@ -76,6 +82,9 @@ def plot_subproc(y_q: mp.Queue,ip: str):
         nonlocal x_all_data
 
         nonlocal ping_line
+
+        nonlocal last_lims1
+        nonlocal last_lims2
 
         if y_q.empty() == False:
 
@@ -145,9 +154,24 @@ def plot_subproc(y_q: mp.Queue,ip: str):
                 if y < 0:
                     timeplot.axvspan(x - 0.1, x + 0.1, color='red', alpha=0.3)
                     
-
+            zoomed1 = False
+            zoomed2 = False
             # update boxplots if new packets received are over the threshold
             if new_data_count>= int(config.get('DEFAULT','boxplot_refresh_count',fallback=4)):
+                
+                # print(boxplot1.get_xlim())
+                # print(last_lims1)
+
+                newlim1 = boxplot1.get_xlim()
+                newlim2 = boxplot2.get_xlim()
+
+                if not is_close_tuple(boxplot1.get_xlim(),last_lims1) :
+                    # print("zoomed")
+                    zoomed1 = True
+
+                if not is_close_tuple(boxplot2.get_xlim(),last_lims2) :
+                    # print("zoomed")
+                    zoomed2 = True
                 
                 # update boxplot 1
                 boxplot1.clear()
@@ -158,7 +182,6 @@ def plot_subproc(y_q: mp.Queue,ip: str):
                 
                 # get boxplot 1 stats
                 draw_boxplot_stats(y_data,y_data_len,boxplot1,box1_dict,config)
-                
                 
 
                 # update boxplot 2          
@@ -172,13 +195,29 @@ def plot_subproc(y_q: mp.Queue,ip: str):
                 draw_boxplot_stats(y_data_len1,y_data_len if y_data_len < len_1 else len_1,boxplot2,box2_dict,config)
                 
 
+                rlim = max(y_data)+5
+                llim = min(y_data)-1
+
+                if not zoomed1:
+                    boxplot1.set_xlim(llim,rlim)
+                    last_lims1 = boxplot1.get_xlim()
+                else:
+                    boxplot1.set_xlim(newlim1[0],newlim1[1])
+
+                if not zoomed2:
+                    boxplot2.set_xlim(llim,rlim)
+                    last_lims2 = boxplot2.get_xlim()
+                else:
+                    boxplot2.set_xlim(newlim2[0],newlim2[1])
 
         
-                if boxplot1.get_xlim()[1]>boxplot2.get_xlim()[1]:
-                    boxplot2.set_xlim(boxplot1.get_xlim())
-                else:
-                    boxplot1.set_xlim(boxplot2.get_xlim())
+                # if boxplot1.get_xlim()[1]>boxplot2.get_xlim()[1]:
+                #     boxplot2.set_xlim(boxplot1.get_xlim())
+                # else:
+                #     boxplot1.set_xlim(boxplot2.get_xlim())
                 new_data_count = 0
+
+                
 
         # line.set_data(x_data,y_data)
         # figure.gca().relim()
@@ -198,6 +237,7 @@ def plot_subproc(y_q: mp.Queue,ip: str):
         boxplot1.clear()
         boxplot1.grid(alpha=0.7)
         boxplot1.boxplot(y_data)
+        last_lims1 = boxplot1.get_xlim()
 
         # timeplost
         timeplot = figure.add_subplot(3,1,1)
