@@ -5,8 +5,13 @@ import multiprocessing as mp
 import sys
 
 import matplotlib.pyplot as plt
+from matplotlib.widgets import Button
 from matplotlib.animation import FuncAnimation
 import multiprocessing as mp
+
+
+
+
 
 def is_close_tuple(t1, t2, tol=1e-2):
     return all(abs(a - b) <= tol for a, b in zip(t1, t2))
@@ -64,6 +69,12 @@ def plot_subproc(y_q: mp.Queue,ip: str):
 
     last_lims1 = ()
     last_lims2 = ()
+    autoscale_ind = True
+
+    def toggle_autoscale(event):
+        nonlocal autoscale_ind
+        autoscale_ind = not autoscale_ind
+        print("autoscale")
 
     #Update routine that is called by FuncAnimation instance to update plot data, returns 2D tuple that is used to graph
     def update(frame,y_q: mp.Queue):
@@ -85,6 +96,7 @@ def plot_subproc(y_q: mp.Queue,ip: str):
 
         nonlocal last_lims1
         nonlocal last_lims2
+        nonlocal autoscale_ind
 
         if y_q.empty() == False:
 
@@ -161,17 +173,10 @@ def plot_subproc(y_q: mp.Queue,ip: str):
                 
                 # print(boxplot1.get_xlim())
                 # print(last_lims1)
+                print(autoscale_ind)
 
-                newlim1 = boxplot1.get_xlim()
-                newlim2 = boxplot2.get_xlim()
-
-                if not is_close_tuple(boxplot1.get_xlim(),last_lims1) :
-                    # print("zoomed")
-                    zoomed1 = True
-
-                if not is_close_tuple(boxplot2.get_xlim(),last_lims2) :
-                    # print("zoomed")
-                    zoomed2 = True
+                currlim1 = boxplot1.get_xlim()
+                currlim2 = boxplot2.get_xlim()
                 
                 # update boxplot 1
                 boxplot1.clear()
@@ -196,19 +201,20 @@ def plot_subproc(y_q: mp.Queue,ip: str):
                 
 
                 rlim = max(y_data)+5
-                llim = min(y_data)-1
+                # llim = min(y_data)-1
+                llim = 0
 
-                if not zoomed1:
+                if autoscale_ind:
                     boxplot1.set_xlim(llim,rlim)
                     last_lims1 = boxplot1.get_xlim()
                 else:
-                    boxplot1.set_xlim(newlim1[0],newlim1[1])
+                    boxplot1.set_xlim(currlim1[0],currlim1[1])
 
-                if not zoomed2:
+                if autoscale_ind:
                     boxplot2.set_xlim(llim,rlim)
                     last_lims2 = boxplot2.get_xlim()
                 else:
-                    boxplot2.set_xlim(newlim2[0],newlim2[1])
+                    boxplot2.set_xlim(currlim2[0],currlim2[1])
 
         
                 # if boxplot1.get_xlim()[1]>boxplot2.get_xlim()[1]:
@@ -231,20 +237,30 @@ def plot_subproc(y_q: mp.Queue,ip: str):
     while True:
         #Initialize plot
         figure = plt.figure(num=1,figsize=(8,4),constrained_layout=True)
+        gs = figure.add_gridspec(nrows=4, ncols=1, height_ratios=[1, 1,1,0.2])
+        
+        # timeplost
+        # timeplot = figure.add_subplot(4,1,1)
+        timeplot = figure.add_subplot(gs[0])
+        ping_line = timeplot.plot(x_all_data,all_data)
 
         # boxplot 1
-        boxplot1 = figure.add_subplot(3,1,2)
+        # boxplot1 = figure.add_subplot(4,1,2)
+        boxplot1 = figure.add_subplot(gs[1])
         boxplot1.clear()
         boxplot1.grid(alpha=0.7)
         boxplot1.boxplot(y_data)
         last_lims1 = boxplot1.get_xlim()
 
-        # timeplost
-        timeplot = figure.add_subplot(3,1,1)
-        ping_line = timeplot.plot(x_all_data,all_data)
-
         # boxplot 2
-        boxplot2 = figure.add_subplot(3,1,3)
+        # boxplot2 = figure.add_subplot(4,1,3)
+        boxplot2 = figure.add_subplot(gs[2])
+
+        # button_plot = figure.add_subplot(4,1,4,)
+        button_plot = figure.add_subplot(gs[3])
+        # button_ax = button_plot.axes([0.1, 0.05, 0.2, 0.075])  # [left, bottom, width, height]
+        button = Button(button_plot, 'Toggle Autoscale')
+        button.on_clicked(toggle_autoscale)
 
         # plot is an animation running on a subprocess so pings continue and are not blocked by plot
         animation = FuncAnimation(figure, update,fargs=[y_q], interval=int(config.get('DEFAULT','fig_refresh',fallback=500)),cache_frame_data=False)
