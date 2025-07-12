@@ -209,6 +209,7 @@ def plot_subproc(y_q: mp.Queue,ip: str):
                     last_lims1 = boxplot1.get_xlim()
                 else:
                     boxplot1.set_xlim(currlim1[0],currlim1[1])
+                    boxplot1.tick_params(labelbottom=True)
 
                 if autoscale_ind:
                     boxplot2.set_xlim(llim,rlim)
