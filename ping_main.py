@@ -134,6 +134,8 @@ def plot_subproc(y_q: mp.Queue,ip: str):
             timeplot.set_title("Pinging: "+ip+" | Packet Loss: "+str(sum(loss_arr))+"/"+str(all_data_len)+" | Last Ping: "+str(last_q if last_q >=0 else "Timeout"))
             timeplot.plot(x_all_data,all_data, color='blue')
             timeplot.grid(alpha=0.7)
+            timeplot.relim()
+            timeplot.autoscale_view()
 
             
             
