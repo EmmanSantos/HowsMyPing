@@ -1,8 +1,11 @@
+from __future__ import print_function
 import configparser
 from icmplib import ping
 import time
 import multiprocessing as mp
 import sys
+import traceback
+
 
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Button
@@ -47,87 +50,138 @@ def draw_boxplot_stats(data: list, length: int,boxplot: plt.Axes,boxplot_dict: d
         
     return
 
-def plot_subproc(y_q: mp.Queue,ip: str):
-    plt.close()
+class FigProcess(mp.Process):
+    def __init__(self,y_q:mp.Queue,ip:str, *args, **kwargs):
+        mp.Process.__init__(self, *args, **kwargs)
+        self._pconn, self._cconn = mp.Pipe()
+        self._exception = None
+        self.y_q = y_q
+        self.ip = ip
 
-    config = configparser.ConfigParser()
-    config.read('./config.ini')
+        self.config = configparser.ConfigParser()
+        self.config.read('./config.ini')
 
-    y_data=[] # ping data without timeouts
-    y_data_len = 0 # len is incremented manually to save CPU time
-    y_data_len1 =[] # subset of ydata containing the last len1 samples
-    new_data_count = 0 # count for updating box plots
-    len_1 = int(config.get('DEFAULT','smaller_length',fallback=20))
-    len_2 = int(config.get('DEFAULT','main_length',fallback=100))
-    
-    loss_arr = [] # counting dropped packets
+        self.y_data=[] # ping data without timeouts
+        self.y_data_len = 0 # len is incremented manually to save CPU time
+        self.y_data_len1 =[] # subset of ydata containing the last len1 samples
+        self.new_data_count = 0 # count for updating box plots
+        self.len_1 = int(self.config.get('DEFAULT','smaller_length',fallback=20))
+        self.len_2 = int(self.config.get('DEFAULT','main_length',fallback=100))
+        
+        self.loss_arr = [] # counting dropped packets
 
 
-    all_data = [] # contains all ping measurements including dropped packets
-    all_data_len = 0
-    x_all_data = []
+        self.all_data = [] # contains all ping measurements including dropped packets
+        self.all_data_len = 0
+        self.x_all_data = []
 
-    last_lims1 = ()
-    last_lims2 = ()
-    autoscale_ind = True
+        self.last_lims1 = ()
+        self.last_lims2 = ()
+        self.autoscale_ind = True
 
-    def toggle_autoscale(event):
-        nonlocal autoscale_ind
-        autoscale_ind = not autoscale_ind
-        print("autoscale")
+    def run(self):
+        try:
+            # mp.Process.run(self)
+            self.fig_create()
+            self._cconn.send(None)
+        except Exception as e:
+            tb = traceback.format_exc()
+            self._cconn.send((e, tb))
+            # raise e  # You can still rise this exception if you need to
 
-    #Update routine that is called by FuncAnimation instance to update plot data, returns 2D tuple that is used to graph
-    def update(frame,y_q: mp.Queue):
-        nonlocal ip
+    def fig_create(self):
+        # init funcanimation(update)
+        plt.close()
+        #while loop for reopening plot window
+        while True:
+            #Initialize plot
+            figure = plt.figure(num=1,figsize=(8,4),constrained_layout=True)
+            gs = figure.add_gridspec(nrows=4, ncols=1, height_ratios=[1, 1,1,0.2])
+            
+            # timeplost
+            # timeplot = figure.add_subplot(4,1,1)
+            self.timeplot = figure.add_subplot(gs[0])
+            self.ping_line = self.timeplot.plot(self.x_all_data,self.all_data)
 
-        nonlocal y_data
-        nonlocal y_data_len1
-        nonlocal new_data_count
-        nonlocal len_1
-        nonlocal len_2
-        nonlocal y_data_len
-        nonlocal loss_arr
+            # boxplot 1
+            # boxplot1 = figure.add_subplot(4,1,2)
+            self.boxplot1 = figure.add_subplot(gs[1])
+            self.boxplot1.clear()
+            self.boxplot1.grid(alpha=0.7)
+            self.boxplot1.boxplot(self.y_data)
+            self.last_lims1 = self.boxplot1.get_xlim()
 
-        nonlocal all_data
-        nonlocal all_data_len
-        nonlocal x_all_data
+            # boxplot 2
+            # boxplot2 = figure.add_subplot(4,1,3)
+            self.boxplot2 = figure.add_subplot(gs[2])
 
-        nonlocal ping_line
+            # button_plot = figure.add_subplot(4,1,4,)
+            self.button_plot = figure.add_subplot(gs[3])
+            # button_ax = button_plot.axes([0.1, 0.05, 0.2, 0.075])  # [left, bottom, width, height]
+            self.button = Button(self.button_plot, 'Toggle Autoscale')
+            self.button.on_clicked(self.toggle_autoscale)
 
-        nonlocal last_lims1
-        nonlocal last_lims2
-        nonlocal autoscale_ind
+            # plot is an animation running on a subprocess so pings continue and are not blocked by plot
+            animation = FuncAnimation(figure, self.update,interval=int(self.config.get('DEFAULT','fig_refresh',fallback=500)),cache_frame_data=False)
+            plt.show()
+            time.sleep(0.5)
+        pass
+    def toggle_autoscale(self,event):
+            self.autoscale_ind = not self.autoscale_ind
+            print("autoscale")
 
-        if y_q.empty() == False:
+    def update(self,frame):
+        #Update routine that is called by FuncAnimation instance to update plot data, returns 2D tuple that is used to graph
+        # nonlocal ip
+
+        # nonlocal y_data
+        # nonlocal y_data_len1
+        # nonlocal new_data_count
+        # nonlocal self.len_1
+        # nonlocal self.len_2
+        # nonlocal y_data_len
+        # nonlocal loss_arr
+
+        # nonlocal all_data
+        # nonlocal all_data_len
+        # nonlocal x_all_data
+
+        # nonlocal ping_line
+
+        # nonlocal last_lims1
+        # nonlocal last_lims2
+        # nonlocal autoscale_ind
+
+        if self.y_q.empty() == False:
 
             # get all in queue
-            while y_q.qsize() >0:
-                last_q = y_q.get()
+            while self.y_q.qsize() >0:
+                last_q = self.y_q.get()
                 
                 # if positive packet is not dropped
                 if last_q >=0:
-                    y_data.append(last_q)
+                    self.y_data.append(last_q)
 
                     # append 0 to loss array  - means no packet lost
-                    loss_arr.append(0)
+                    self.loss_arr.append(0)
 
 
                     # length is stored because len() is slow
-                    if y_data_len < len_2:
-                        y_data_len+=1
+                    if self.y_data_len < self.len_2:
+                        self.y_data_len+=1
 
-                    new_data_count +=1
+                    self.new_data_count +=1
                 else:
                     # append 1 to loss array  - means packet lost
-                    loss_arr.append(1)
+                    self.loss_arr.append(1)
 
 
                     # plot packet loss
 
                 
-                all_data.append(last_q)
-                all_data_len+=1
-                if all_data_len<=len_2: x_all_data.append(all_data_len) 
+                self.all_data.append(last_q)
+                self.all_data_len+=1
+                if self.all_data_len<=self.len_2: self.x_all_data.append(self.all_data_len) 
                 
 
                 
@@ -135,139 +189,102 @@ def plot_subproc(y_q: mp.Queue,ip: str):
 
             # Caps the length of the  arrays
 
-            if all_data_len >len_2:
-                all_data_len = len_2
+            if self.all_data_len >self.len_2:
+                self.all_data_len = self.len_2
 
             # discards older data if longer than desired length
-            y_data_len1 = y_data[-len_1:] if y_data_len>=len_1 else y_data
-            y_data = y_data[-len_2:] if y_data_len>=len_2 else y_data
-            loss_arr = loss_arr[-len_2:] if all_data_len>=len_2 else loss_arr
+            self.y_data_len1 = self.y_data[-self.len_1:] if self.y_data_len>=self.len_1 else self.y_data
+            self.y_data = self.y_data[-self.len_2:] if self.y_data_len>=self.len_2 else self.y_data
+            self.loss_arr = self.loss_arr[-self.len_2:] if self.all_data_len>=self.len_2 else self.loss_arr
 
-            all_data = all_data[-len_2:] if all_data_len>=len_2 else all_data
+            self.all_data = self.all_data[-self.len_2:] if self.all_data_len>=self.len_2 else self.all_data
             
             
             # update time plot
-            for artist in timeplot.lines:
+            for artist in self.timeplot.lines:
                 artist.remove()
-            for patch in timeplot.patches[:]:
+            for patch in self.timeplot.patches[:]:
                 patch.remove()
-            timeplot.set_prop_cycle(None) 
-            timeplot.set_title("Pinging: "+ip+" | Packet Loss: "+str(sum(loss_arr))+"/"+str(all_data_len)+" | Last Ping: "+str(last_q if last_q >=0 else "Timeout"))
-            timeplot.plot(x_all_data,all_data, color='blue')
-            timeplot.grid(alpha=0.7)
-            timeplot.relim()
-            timeplot.autoscale_view()
+            self.timeplot.set_prop_cycle(None) 
+            self.timeplot.set_title("Pinging: "+self.ip+" | Packet Loss: "+str(sum(self.loss_arr))+"/"+str(self.all_data_len)+" | Last Ping: "+str(last_q if last_q >=0 else "Timeout"))
+            self.timeplot.plot(self.x_all_data,self.all_data, color='blue')
+            self.timeplot.grid(alpha=0.7)
+            self.timeplot.relim()
+            self.timeplot.autoscale_view()
 
             
             
             
             # plot timeouts
-            for x, y in zip(range(1,all_data_len), all_data):
+            for x, y in zip(range(1,self.all_data_len), self.all_data):
                 if y < 0:
-                    timeplot.axvspan(x - 0.1, x + 0.1, color='red', alpha=0.3)
+                    self.timeplot.axvspan(x - 0.1, x + 0.1, color='red', alpha=0.3)
                     
             zoomed1 = False
             zoomed2 = False
             # update boxplots if new packets received are over the threshold
-            if new_data_count>= int(config.get('DEFAULT','boxplot_refresh_count',fallback=4)):
+            if self.new_data_count>= int(self.config.get('DEFAULT','boxplot_refresh_count',fallback=4)):
                 
                 # print(boxplot1.get_xlim())
                 # print(last_lims1)
-                print(autoscale_ind)
+                print(self.autoscale_ind)
 
-                currlim1 = boxplot1.get_xlim()
-                currlim2 = boxplot2.get_xlim()
+                currlim1 = self.boxplot1.get_xlim()
+                currlim2 = self.boxplot2.get_xlim()
                 
                 # update boxplot 1
-                boxplot1.clear()
-                boxplot1.grid(alpha=0.7)
-                boxplot1.tick_params(labelbottom=False)
-                box1_dict =boxplot1.boxplot(y_data,vert=False,widths=0.7,tick_labels= ['Last '+str(y_data_len)])
-                boxplot1.scatter( y_data,[1]*y_data_len, alpha=0.6, color='blue', label='Data Points')
+                self.boxplot1.clear()
+                self.boxplot1.grid(alpha=0.7)
+                self.boxplot1.tick_params(labelbottom=False)
+                box1_dict =self.boxplot1.boxplot(self.y_data,vert=False,widths=0.7,tick_labels= ['Last '+str(self.y_data_len)])
+                self.boxplot1.scatter( self.y_data,[1]*self.y_data_len, alpha=0.6, color='blue', label='Data Points')
                 
                 # get boxplot 1 stats
-                draw_boxplot_stats(y_data,y_data_len,boxplot1,box1_dict,config)
+                draw_boxplot_stats(self.y_data,self.y_data_len,self.boxplot1,box1_dict,self.config)
                 
 
                 # update boxplot 2          
-                boxplot2.clear()
-                boxplot2.grid(alpha=0.7)
-                box2_dict = boxplot2.boxplot(y_data_len1,vert=False,widths=0.7,tick_labels = ['Last '+str(y_data_len if y_data_len < len_1 else len_1 )])
-                boxplot2.scatter( y_data_len1,[1]*len(y_data_len1), alpha=0.6, color='blue', label='Data Points')
+                self.boxplot2.clear()
+                self.boxplot2.grid(alpha=0.7)
+                box2_dict = self.boxplot2.boxplot(self.y_data_len1,vert=False,widths=0.7,tick_labels = ['Last '+str(self.y_data_len if self.y_data_len < self.len_1 else self.len_1 )])
+                self.boxplot2.scatter( self.y_data_len1,[1]*len(self.y_data_len1), alpha=0.6, color='blue', label='Data Points')
 
                 # # get boxplot 2 stats
                 # stats2 = gen_boxplot_stats(y_data,y_data_len,boxplot2,box2_dict)[0]
-                draw_boxplot_stats(y_data_len1,y_data_len if y_data_len < len_1 else len_1,boxplot2,box2_dict,config)
+                draw_boxplot_stats(self.y_data_len1,self.y_data_len if self.y_data_len < self.len_1 else self.len_1,self.boxplot2,box2_dict,self.config)
                 
 
-                rlim = max(y_data)+5
+                rlim = max(self.y_data)+5
                 # llim = min(y_data)-1
                 llim = 0
 
-                if autoscale_ind:
-                    boxplot1.set_xlim(llim,rlim)
-                    last_lims1 = boxplot1.get_xlim()
+                if self.autoscale_ind:
+                    self.boxplot1.set_xlim(llim,rlim)
+                    self.last_lims1 = self.boxplot1.get_xlim()
                 else:
-                    boxplot1.set_xlim(currlim1[0],currlim1[1])
-                    boxplot1.tick_params(labelbottom=True)
+                    self.boxplot1.set_xlim(currlim1[0],currlim1[1])
+                    self.boxplot1.tick_params(labelbottom=True)
 
-                if autoscale_ind:
-                    boxplot2.set_xlim(llim,rlim)
-                    last_lims2 = boxplot2.get_xlim()
+                if self.autoscale_ind:
+                    self.boxplot2.set_xlim(llim,rlim)
+                    self.last_lims2 = self.boxplot2.get_xlim()
                 else:
-                    boxplot2.set_xlim(currlim2[0],currlim2[1])
+                    self.boxplot2.set_xlim(currlim2[0],currlim2[1])
 
         
                 # if boxplot1.get_xlim()[1]>boxplot2.get_xlim()[1]:
                 #     boxplot2.set_xlim(boxplot1.get_xlim())
                 # else:
                 #     boxplot1.set_xlim(boxplot2.get_xlim())
-                new_data_count = 0
+                self.new_data_count = 0
 
-                
+        pass
 
-        # line.set_data(x_data,y_data)
-        # figure.gca().relim()
-        # figure.gca().autoscale_view()
-        # return line,
-
-        
-
-
-    #while loop for reopening plot window
-    while True:
-        #Initialize plot
-        figure = plt.figure(num=1,figsize=(8,4),constrained_layout=True)
-        gs = figure.add_gridspec(nrows=4, ncols=1, height_ratios=[1, 1,1,0.2])
-        
-        # timeplost
-        # timeplot = figure.add_subplot(4,1,1)
-        timeplot = figure.add_subplot(gs[0])
-        ping_line = timeplot.plot(x_all_data,all_data)
-
-        # boxplot 1
-        # boxplot1 = figure.add_subplot(4,1,2)
-        boxplot1 = figure.add_subplot(gs[1])
-        boxplot1.clear()
-        boxplot1.grid(alpha=0.7)
-        boxplot1.boxplot(y_data)
-        last_lims1 = boxplot1.get_xlim()
-
-        # boxplot 2
-        # boxplot2 = figure.add_subplot(4,1,3)
-        boxplot2 = figure.add_subplot(gs[2])
-
-        # button_plot = figure.add_subplot(4,1,4,)
-        button_plot = figure.add_subplot(gs[3])
-        # button_ax = button_plot.axes([0.1, 0.05, 0.2, 0.075])  # [left, bottom, width, height]
-        button = Button(button_plot, 'Toggle Autoscale')
-        button.on_clicked(toggle_autoscale)
-
-        # plot is an animation running on a subprocess so pings continue and are not blocked by plot
-        animation = FuncAnimation(figure, update,fargs=[y_q], interval=int(config.get('DEFAULT','fig_refresh',fallback=500)),cache_frame_data=False)
-        plt.show()
-        time.sleep(0.5)
-
+    @property
+    def exception(self):
+        if self._pconn.poll():
+            self._exception = self._pconn.recv()
+        return self._exception
 
 
 def main():
@@ -281,7 +298,9 @@ def main():
         ip = str(config.get('DEFAULT','ip',fallback='8.8.8.8'))
 
     data_q = mp.Queue()
-    plot_window = mp.Process(target=plot_subproc,args=[data_q,ip])
+    # plot_window = mp.Process(target=plot_subproc,args=[data_q,ip])
+    # plot_window.start()
+    plot_window = FigProcess(data_q,ip)
     plot_window.start()
 
     while True:
